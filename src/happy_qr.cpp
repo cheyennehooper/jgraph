@@ -6,6 +6,8 @@
 using namespace std;
 using vvb = vector<vector<bool>>;
 
+struct Color { float r, g, b; };
+
 vvb load_ppm(const string& path){
     //load ppm file and convert to 2d bool array of pixels
     ifstream f(path, ios::binary);
@@ -98,7 +100,26 @@ vvb grid(const vvb& pixels){
     return qr;
 }
 
-void make_jgraph(const vvb& qr, float mod_size){
+Color color_mode(const string& mode, int row, int col, int size){
+    if(mode == "rainbow"){
+        float hue = (float)(row + col) / (2.0f * (size - 1));
+        if(hue < 0.5f){
+            float s = hue * 2.0f;
+            return {1.0f - s, s, 0.0f};
+        } else{
+            float s = (hue - 0.5f) * 2.0f;
+            return {0.0f, 1.0f - s, s};
+        }
+    } else if(mode == "random"){
+        int pick = (row * 31 + col * 17) % 3;
+        if(pick == 0) return {1.0f, 0.0f, 0.0f}; //red
+        if(pick == 1) return {0.0f, 1.0f, 0.0f}; //green
+        return {0.0f, 0.0f, 1.0f}; //blue
+    }
+    return {0.0f, 0.0f, 0.0f}; //black
+}
+
+void make_jgraph(const vvb& qr, float mod_size, const string& colormode){
     int size = qr.size();
     float total_size = size * mod_size;
 
@@ -115,7 +136,8 @@ void make_jgraph(const vvb& qr, float mod_size){
             float y0 = (size - 1 - row) * mod_size; //flip y axis for jgraph
             float x1 = x0 + mod_size;
             float y1 = y0 + mod_size;
-            printf("newline poly pcfill 0 0 0\n");
+            Color c = color_mode(colormode, row, col, size);
+            printf("newline poly pcfill %.3f %.3f %.3f\n", c.r, c.g, c.b);
             printf("pts %.2f %.2f  %.2f %.2f  %.2f %.2f  %.2f %.2f\n", x0, y0, x1, y0, x1, y1, x0, y1);
         }
     }
@@ -124,15 +146,16 @@ void make_jgraph(const vvb& qr, float mod_size){
 
 int main(int argc, char* argv[]) {
     if (argc < 2){
-        cout << "Usage: happy_qr input.ppm\n";
+        cout << "Usage: happy_qr input.ppm [rainbow\random]\n";
         return 1;
     }
     //cout << "happy_qr: got file " << argv[1] << "\n";
+    //color mode
+    string colormode = (argc >= 3) ? argv[2] : "normal";
 
     vvb pixels = load_ppm(argv[1]);
     vvb qr = grid(pixels);
-    make_jgraph(qr, 1.0f);
-
+    make_jgraph(qr, 1.0f, colormode);
 
     // //print qr grid to stdout
     // for(const auto& row : qr){
