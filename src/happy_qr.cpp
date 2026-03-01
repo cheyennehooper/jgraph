@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstdio>
 #include <string>
 #include <fstream>
 #include <vector>
@@ -97,22 +98,48 @@ vvb grid(const vvb& pixels){
     return qr;
 }
 
+void make_jgraph(const vvb& qr, float mod_size){
+    int size = qr.size();
+    float total_size = size * mod_size;
+
+    printf("newgraph\n");
+    printf("xaxis min 0 max %.2f size 4 nodraw\n", total_size);
+    printf("yaxis min 0 max %.2f size 4 nodraw\n", total_size);
+    printf("newline poly pcfill 1 1 1\n");
+    printf("pts 0 0  %.2f 0  %.2f %.2f  0 %.2f\n", total_size, total_size, total_size, total_size);
+
+    for(int row = 0; row < size; row++){
+        for(int col = 0; col < size; col++){
+            if(!qr[row][col]) continue; //skip light mods
+            float x0 = col * mod_size;
+            float y0 = (size - 1 - row) * mod_size; //flip y axis for jgraph
+            float x1 = x0 + mod_size;
+            float y1 = y0 + mod_size;
+            printf("newline poly pcfill 0 0 0\n");
+            printf("pts %.2f %.2f  %.2f %.2f  %.2f %.2f  %.2f %.2f\n", x0, y0, x1, y0, x1, y1, x0, y1);
+        }
+    }
+}
+
+
 int main(int argc, char* argv[]) {
     if (argc < 2){
         cout << "Usage: happy_qr input.ppm\n";
         return 1;
     }
-    cout << "happy_qr: got file " << argv[1] << "\n";
+    //cout << "happy_qr: got file " << argv[1] << "\n";
 
     vvb pixels = load_ppm(argv[1]);
     vvb qr = grid(pixels);
+    make_jgraph(qr, 1.0f);
 
-    //print qr grid to stdout
-    for(const auto& row : qr){
-        for(bool cell : row){
-            cout << (cell ? "██" : "  ");
-        }
-        cout << "\n";
-    }
+
+    // //print qr grid to stdout
+    // for(const auto& row : qr){
+    //     for(bool cell : row){
+    //         cout << (cell ? "██" : "  ");
+    //     }
+    //     cout << "\n";
+    // }
     return 0;
 }
