@@ -1,3 +1,6 @@
+#this was actually super annoying bc i dont think ive ever set up 
+#a makefile to this degree before but it was v satisfying in the end
+#I hope only 2 commands is satisfying for you too ((: 
 CXX      = g++
 CXXFLAGS = -O2 -std=c++17 -Wall -Wextra
 JGRAPH   = ~jplank/src/jgraph/work/jgraph

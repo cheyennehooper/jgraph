@@ -5,6 +5,7 @@
 #include <vector>
 
 using namespace std;
+//storing pixel data for image or qr code
 using vvb = vector<vector<bool>>;
 struct Color { float r, g, b; };
 using vvc = vector<vector<Color>>;
@@ -19,16 +20,17 @@ vvb load_ppm(const string& path){
     //read header
     string format;
     int width, height, maxval;
-    //read format, width, height, maxval from header
     f >> format >> width >> height >> maxval;
-    f.ignore(1); //skip newline after header
+    f.ignore(1);
+    //only grayscale and rgb
     if(format != "P5" && format != "P6"){
         cerr << "only P5/6 PPM supported not: " << format << "\n";
         exit(1);
     }
     //pixel data to bool array true == dark false == light
     //channels is 1 for grayscale (P5) and 3 for rgb (P6)
-    int channels = (format == "P5") ? 1 : 3; //grayscale or rgb
+    int channels = (format == "P5") ? 1 : 3; 
+
     vvb pixels(height, vector<bool>(width));
     for(int y = 0; y < height; y++){
         //read pixel data for row y
@@ -47,7 +49,7 @@ vvb load_ppm(const string& path){
     }
     return pixels;
 }
-//basically same as load_ppm 
+//basically same as load_ppm but for images
 vvc load_image(const string& path){
     ifstream f(path, ios::binary);
     if(!f){
@@ -71,7 +73,7 @@ vvc load_image(const string& path){
 }
 
 void find_start(const vvb& pixels, int& og_x, int& og_y){
-    //find first dark pixel in pixels and return its coordinates in x and y
+    //find first dark pixel and ret x,y
     for(int y = 0; y < (int)pixels.size(); y++){
         for(int x = 0; x < (int)pixels[0].size(); x++){
             if(pixels[y][x]){
@@ -84,7 +86,7 @@ void find_start(const vvb& pixels, int& og_x, int& og_y){
     cerr << "error: no dark pixels found\n";
     exit(1);
 }
-
+//modules are a thing in qr codes ive learned
 int module_size(const vvb& pixels, int og_x, int og_y){
     //count how many dark pixels in row og_y starting from og_x
     int count = 0;
@@ -95,7 +97,7 @@ int module_size(const vvb& pixels, int og_x, int og_y){
             break;
         }
     }
-    //each qr module is 7 pixels wide
+    //each qr module is 7 pixels wide apparently 
     return count / 7; 
 }
 
@@ -103,7 +105,7 @@ int grid_size(int width, int og_x, int module_size){
     int size = width - (og_x * 2);
     return size / module_size;
 }
-
+//convert pixels to 2d array of modules
 vvb grid(const vvb& pixels){
     int og_x, og_y;
     find_start(pixels, og_x, og_y);
@@ -111,7 +113,7 @@ vvb grid(const vvb& pixels){
     int mod_size = module_size(pixels, og_x, og_y);
     int size = grid_size(pixels[0].size(), og_x, mod_size);
     int half = mod_size / 2;
-
+    //for each module get center pixel to see if dark or light
     vvb qr(size, vector<bool>(size, false));
     for(int row = 0; row < size; row++){
         for(int col = 0; col < size; col++){
@@ -122,7 +124,7 @@ vvb grid(const vvb& pixels){
     }
     return qr;
 }
-
+//all my different modes for output ((: other than image
 Color mode(const string& mode, int row, int col, int size){
     if(mode == "rainbow"){
         float hue = (float)(row + col) / (2.0f * (size - 1));
@@ -146,14 +148,14 @@ Color mode(const string& mode, int row, int col, int size){
         else return {1.0f, 0.4f, 0.4f}; //light red
     } else if (mode == "checker") {
         if ((row + col) % 2 == 0){
-            return {1.0f, 0.0f, 0.0f};  // red
+            return {1.0f, 0.0f, 0.0f};  //red
         } else {
-            return {0.0f, 0.0f, 1.0f}; // blue
+            return {0.0f, 0.0f, 1.0f}; //blue
         }
     }
     return {0.0f, 0.0f, 0.0f}; //black
 }
-
+//output jgraph commands 
 void make_jgraph(const vvb& qr, float mod_size, const string& colormode, const vvc* img = nullptr){
     int size = qr.size();
     float total_size = size * mod_size;
@@ -166,15 +168,18 @@ void make_jgraph(const vvb& qr, float mod_size, const string& colormode, const v
 
     for(int row = 0; row < size; row++){
         for(int col = 0; col < size; col++){
-            if(!qr[row][col]) continue; //skip light mods
+            //skip light mods
+            if(!qr[row][col]) continue;
             float x0 = col * mod_size;
-            float y0 = (size - 1 - row) * mod_size; //flip y axis for jgraph
+            //flip y axis for jgraph bc y0 is bottom left
+            float y0 = (size - 1 - row) * mod_size; 
             float x1 = x0 + mod_size;
             float y1 = y0 + mod_size;
 
             Color c;
             if(colormode == "image" && img){
-                c = (*img)[row][col]; //use pic colors
+                //use pic colors
+                c = (*img)[row][col]; 
             } else {
                 c = mode(colormode, row, col, size);
             }
@@ -187,7 +192,7 @@ void make_jgraph(const vvb& qr, float mod_size, const string& colormode, const v
 
 int main(int argc, char* argv[]) {
     if (argc < 2){
-        cout << "Usage: happy_qr input.ppm [rainbow\random]\n";
+        cout << "Usage: happy_qr input.ppm [rainbow-random-vstripe-hstripe-checker-image]\n";
         return 1;
     }
     //cout << "happy_qr: got file " << argv[1] << "\n";
