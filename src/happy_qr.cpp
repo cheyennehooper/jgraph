@@ -3,10 +3,11 @@
 #include <string>
 #include <fstream>
 #include <vector>
+
 using namespace std;
 using vvb = vector<vector<bool>>;
-
 struct Color { float r, g, b; };
+using vvc = vector<vector<Color>>;
 
 vvb load_ppm(const string& path){
     //load ppm file and convert to 2d bool array of pixels
@@ -45,6 +46,28 @@ vvb load_ppm(const string& path){
         }
     }
     return pixels;
+}
+//basically same as load_ppm 
+vvc load_image(const string& path){
+    ifstream f(path, ios::binary);
+    if(!f){
+        cerr << "Error: cannot open file " << path << "\n";
+        exit(1);
+    }
+    string format;
+    int width, height, maxval;
+    f >> format >> width >> height >> maxval;
+    f.ignore(1);
+    int channels = (format == "P5") ? 1 : 3;
+    vvc img(height, vector<Color>(width));
+    for(int y = 0; y < height; y++){
+        for(int x = 0; x < width; x++){
+            unsigned char rgb[3] = {0,0,0};
+            f.read(reinterpret_cast<char*>(rgb), channels);
+            img[y][x] = {rgb[0] / (float)maxval, rgb[1] / (float)maxval, rgb[2] / (float)maxval};
+        }
+    }
+    return img;
 }
 
 void find_start(const vvb& pixels, int& og_x, int& og_y){
@@ -100,7 +123,7 @@ vvb grid(const vvb& pixels){
     return qr;
 }
 
-Color color_mode(const string& mode, int row, int col, int size){
+Color mode(const string& mode, int row, int col, int size){
     if(mode == "rainbow"){
         float hue = (float)(row + col) / (2.0f * (size - 1));
         if(hue < 0.5f){
@@ -115,11 +138,23 @@ Color color_mode(const string& mode, int row, int col, int size){
         if(pick == 0) return {1.0f, 0.0f, 0.0f}; //red
         if(pick == 1) return {0.0f, 1.0f, 0.0f}; //green
         return {0.0f, 0.0f, 1.0f}; //blue
+    } else if (mode == "hstripe") {
+        if (row % 2 == 0) return {0.0f, 0.3f, 0.8f}; //dark blue
+        else return {0.4f, 0.7f, 1.0f}; //light blue
+    } else if (mode == "vstripe") {
+        if (col % 2 == 0) return {0.8f, 0.0f, 0.0f}; //dark red
+        else return {1.0f, 0.4f, 0.4f}; //light red
+    } else if (mode == "checker") {
+        if ((row + col) % 2 == 0){
+            return {1.0f, 0.0f, 0.0f};  // red
+        } else {
+            return {0.0f, 0.0f, 1.0f}; // blue
+        }
     }
     return {0.0f, 0.0f, 0.0f}; //black
 }
 
-void make_jgraph(const vvb& qr, float mod_size, const string& colormode){
+void make_jgraph(const vvb& qr, float mod_size, const string& colormode, const vvc* img = nullptr){
     int size = qr.size();
     float total_size = size * mod_size;
 
@@ -136,7 +171,13 @@ void make_jgraph(const vvb& qr, float mod_size, const string& colormode){
             float y0 = (size - 1 - row) * mod_size; //flip y axis for jgraph
             float x1 = x0 + mod_size;
             float y1 = y0 + mod_size;
-            Color c = color_mode(colormode, row, col, size);
+
+            Color c;
+            if(colormode == "image" && img){
+                c = (*img)[row][col]; //use pic colors
+            } else {
+                c = mode(colormode, row, col, size);
+            }
             printf("newline poly pcfill %.3f %.3f %.3f\n", c.r, c.g, c.b);
             printf("pts %.2f %.2f  %.2f %.2f  %.2f %.2f  %.2f %.2f\n", x0, y0, x1, y0, x1, y1, x0, y1);
         }
@@ -151,18 +192,17 @@ int main(int argc, char* argv[]) {
     }
     //cout << "happy_qr: got file " << argv[1] << "\n";
     //color mode
-    string colormode = (argc >= 3) ? argv[2] : "normal";
+    string mode = (argc >= 3) ? argv[2] : "normal";
 
     vvb pixels = load_ppm(argv[1]);
     vvb qr = grid(pixels);
-    make_jgraph(qr, 1.0f, colormode);
 
-    // //print qr grid to stdout
-    // for(const auto& row : qr){
-    //     for(bool cell : row){
-    //         cout << (cell ? "██" : "  ");
-    //     }
-    //     cout << "\n";
-    // }
+    if(mode == "image"){
+        vvc img = load_image(argv[3]);
+        make_jgraph(qr, 1.0f, mode, &img);
+    } else {
+        make_jgraph(qr, 1.0f, mode);
+    }
+    
     return 0;
 }
